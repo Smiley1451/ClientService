@@ -29,8 +29,7 @@ public class SecurityConfig {
 
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2
-                        // Use default JWT validation (checks signature and issuer)
-                        .jwt()
+                               .jwt()
                 )
                 .csrf(ServerHttpSecurity.CsrfSpec::disable); // Disable CSRF for stateless API
 

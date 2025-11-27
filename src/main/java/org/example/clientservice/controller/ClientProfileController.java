@@ -6,8 +6,6 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 
@@ -18,56 +16,36 @@ public class ClientProfileController {
 
     private final ClientProfileService clientProfileService;
 
-    @GetMapping("/hello")
-    public Mono<String> sayHello() {
-        return Mono.just("Hello! The Client Service is running on port 8081.");
+    // --- PUBLIC/USER ENDPOINTS ---
+
+    @GetMapping("/{userId}")
+    public Mono<ResponseEntity<ClientProfileDto>> getClientProfile(@PathVariable String userId) {
+        return clientProfileService.getClientProfile(userId)
+                .map(ResponseEntity::ok);
     }
 
     /**
-     * POST /{userId} - Creates or overwrites a profile
-     * Use this in Postman to create a user for testing.
+     * Update Profile (User Editable Fields Only)
+     * Name, Phone, Skills, Location
      */
-    @PostMapping("/{userId}")
-    @ResponseStatus(HttpStatus.CREATED)
-    public Mono<ClientProfileDto> createClientProfile(
-            @PathVariable String userId,
-            @Valid @RequestBody Mono<ClientProfileDto> profileDtoMono) {
-
-        return clientProfileService.createClientProfile(userId, profileDtoMono);
-    }
-
-    @GetMapping("/{userId}")
-    public Mono<ResponseEntity<ClientProfileDto>> getClientProfile(
-            @PathVariable String userId,
-            @AuthenticationPrincipal Jwt jwt) { // jwt will be null
-
-        // --- THIS BLOCK MUST BE COMMENTED OUT FOR TESTING ---
-        /*
-        if (jwt == null || !jwt.getSubject().equals(userId)) {
-             return Mono.just(ResponseEntity.status(HttpStatus.FORBIDDEN).build());
-        }
-        */
-
-        return clientProfileService.getClientProfile(userId)
-                .map(ResponseEntity::ok)
-                .defaultIfEmpty(ResponseEntity.notFound().build());
-    }
-
     @PutMapping("/{userId}")
     public Mono<ResponseEntity<ClientProfileDto>> updateClientProfile(
             @PathVariable String userId,
-            @Valid @RequestBody Mono<ClientProfileDto> profileDtoMono,
-            @AuthenticationPrincipal Jwt jwt) { // jwt will be null
-
-        // --- THIS BLOCK MUST BE COMMENTED OUT FOR TESTING ---
-        /*
-        if (jwt == null || !jwt.getSubject().equals(userId)) {
-             return Mono.just(ResponseEntity.status(HttpStatus.FORBIDDEN).build());
-        }
-        */
+            @Valid @RequestBody Mono<ClientProfileDto> profileDtoMono) {
 
         return clientProfileService.updateClientProfile(userId, profileDtoMono)
-                .map(ResponseEntity::ok)
-                .defaultIfEmpty(ResponseEntity.notFound().build());
+                .map(ResponseEntity::ok);
+    }
+
+    // --- SYSTEM/ADMIN ENDPOINTS ---
+
+    /**
+     * Manually Trigger AI Refresh (For Demo/Testing)
+     * Normally this runs via Scheduler on the 1st of the month.
+     */
+    @PostMapping("/{userId}/refresh-ai")
+    public Mono<ResponseEntity<ClientProfileDto>> triggerAiRefresh(@PathVariable String userId) {
+        return clientProfileService.performMonthlyAiAnalysis(userId)
+                .map(ResponseEntity::ok);
     }
 }

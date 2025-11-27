@@ -1,10 +1,13 @@
 package org.example.clientservice.service;
 
-import org.example.clientservice.dto.ClientProfileDto;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.clientservice.config.UserCreatedEvent;
+import org.example.clientservice.dto.ClientProfileDto;
 import org.example.clientservice.model.ClientProfile;
+import org.example.clientservice.model.ReviewRating;
 import org.example.clientservice.repository.ClientProfileRepository;
-
+import org.example.clientservice.repository.ReviewRatingRepository;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -13,132 +16,165 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
 
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.List;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class ClientProfileService {
 
     private final ClientProfileRepository profileRepository;
+    private final ReviewRatingRepository reviewRepository;
+    private final GroqService groqService;
+    private final ObjectMapper objectMapper;
 
+    /**
+     * 1. Initialize Profile from Kafka Event (Auth Service)
+     */
     public Mono<ClientProfile> initializeNewClientProfile(UserCreatedEvent event) {
         log.info("Initializing new profile for userId: {}", event.getUserId());
 
         ClientProfile newProfile = ClientProfile.builder()
                 .userId(event.getUserId())
                 .name(event.getUserName())
+                .email(event.getEmail())
+                .source(event.getSource())
+                .createdAt(event.getCreatedAt())
+                // Defaults
                 .profileCompletionPercent(0)
                 .recommendationFlag(false)
-
-                // --- ADDED NEW FIELDS ---
-                .email(event.getEmail())
-                .createdAt(event.getCreatedAt())
-                .source(event.getSource())
-                // --- END OF NEW FIELDS ---
-
+                .totalReviews(0)
+                .averageRating(0.0)
+                .jobSuccessRate(100.0)
+                .aiGeneratedSummary("New worker profile initialized.")
                 .build();
-
-        newProfile.setNew(true); // Set the isNew flag
 
         return profileRepository.save(newProfile)
                 .doOnError(e -> log.error("Failed to initialize profile for userId: {}", event.getUserId(), e));
     }
 
     /**
-     * Creates a new profile for testing.
-     * (We also add the new fields here, making them optional)
-     */
-    public Mono<ClientProfileDto> createClientProfile(String userId, Mono<ClientProfileDto> profileDtoMono) {
-        return profileDtoMono
-                .flatMap(dto -> {
-                    ClientProfile newProfile = ClientProfile.builder()
-                            .userId(userId)
-                            .name(dto.name())
-                            .phone(dto.phone())
-                            .skills(dto.skills())
-                            .latitude(dto.latitude())
-                            .longitude(dto.longitude())
-                            .recommendationFlag(dto.recommendationFlag())
-                            .profileCompletionPercent(calculateCompletion(dto))
-
-                            // --- ADDED NEW FIELDS (read from DTO) ---
-                            .email(dto.email())
-                            .createdAt(dto.createdAt())
-                            .source("postman-test") // Source is internal for this
-                            // --- END OF NEW FIELDS ---
-
-                            .build();
-
-                    newProfile.setNew(true);
-
-                    return profileRepository.save(newProfile);
-                })
-                .map(this::entityToDto);
-    }
-
-    /**
-     * Retrieves a client's profile by their user ID.
-     */
-    public Mono<ClientProfileDto> getClientProfile(String userId) {
-        return profileRepository.findById(userId)
-                .map(this::entityToDto)
-                .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Profile not found")));
-    }
-
-    /**
-     * Updates an existing client's profile.
+     * 2. User Update Endpoint (Restricted)
+     * User can ONLY update: Name, Phone, Skills, Location.
+     * User CANNOT update: AI Summary, Ratings, Scores, Wage.
      */
     public Mono<ClientProfileDto> updateClientProfile(String userId, Mono<ClientProfileDto> profileDtoMono) {
-        return profileRepository.findById(userId)
+        return profileRepository.findByUserId(userId)
                 .flatMap(existingProfile -> profileDtoMono.flatMap(dto -> {
 
-                    existingProfile.setName(dto.name());
-                    existingProfile.setPhone(dto.phone());
-                    existingProfile.setSkills(dto.skills());
-                    existingProfile.setLatitude(dto.latitude());
-                    existingProfile.setLongitude(dto.longitude());
-                    existingProfile.setRecommendationFlag(dto.recommendationFlag());
-                    existingProfile.setProfileCompletionPercent(calculateCompletion(dto));
+                    // Explicitly mapping ONLY user-editable fields
+                    if(dto.name() != null) existingProfile.setName(dto.name());
+                    if(dto.phone() != null) existingProfile.setPhone(dto.phone());
+                    if(dto.skills() != null) existingProfile.setSkills(dto.skills());
+                    if(dto.latitude() != null) existingProfile.setLatitude(dto.latitude());
+                    if(dto.longitude() != null) existingProfile.setLongitude(dto.longitude());
 
-                    // We also update the email if it's part of the DTO
-                    existingProfile.setEmail(dto.email());
+                    // Recalculate completion (local logic)
+                    existingProfile.setProfileCompletionPercent(calculateCompletion(existingProfile));
 
                     return profileRepository.save(existingProfile);
                 }))
                 .map(this::entityToDto)
-                .doOnSuccess(dto -> log.info("Profile updated for userId: {}", dto.userId()))
                 .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Profile not found")));
     }
 
-    // --- Helper Methods ---
+    /**
+     * 3. Monthly AI Refresh Logic
+     * - Fetches "Last Month's" reviews.
+     * - Calls Groq with (Profile + Reviews).
+     * - Updates only the AI/Metric fields.
+     */
+    public Mono<ClientProfileDto> performMonthlyAiAnalysis(String userId) {
+        // Define "Last Month" range
+        Instant now = Instant.now();
+        Instant startOfLastMonth = now.minus(30, ChronoUnit.DAYS); // Approximate for demo
+
+        return profileRepository.findByUserId(userId)
+                .flatMap(profile ->
+                        reviewRepository.findByWorkerIdAndCreatedAtBetween(userId, startOfLastMonth, now)
+                                .collectList()
+                                .flatMap(reviews -> {
+                                    // Call LLM
+                                    return groqService.generateMonthlyProfileUpdate(profile, reviews)
+                                            .flatMap(jsonResponse -> updateProfileWithAiData(profile, jsonResponse));
+                                })
+                )
+                .map(this::entityToDto);
+    }
+
+    private Mono<ClientProfile> updateProfileWithAiData(ClientProfile profile, String jsonResponse) {
+        try {
+            JsonNode root = objectMapper.readTree(jsonResponse);
+
+            // Map LLM fields
+            if (root.has("aiGeneratedSummary"))
+                profile.setAiGeneratedSummary(root.get("aiGeneratedSummary").asText());
+            if (root.has("experienceLevel"))
+                profile.setExperienceLevel(root.get("experienceLevel").asText());
+            if (root.has("recommendedWagePerHour"))
+                profile.setRecommendedWagePerHour(root.get("recommendedWagePerHour").asDouble());
+            if (root.has("profileStrengthScore"))
+                profile.setProfileStrengthScore(root.get("profileStrengthScore").asInt());
+
+            if (root.has("topReviewKeywords") && root.get("topReviewKeywords").isArray()) {
+                List<String> keywords = new ArrayList<>();
+                root.get("topReviewKeywords").forEach(k -> keywords.add(k.asText()));
+                profile.setTopReviewKeywords(keywords);
+            }
+
+            profile.setLastAiUpdate(Instant.now());
+
+            return profileRepository.save(profile);
+
+        } catch (Exception e) {
+            log.error("Error parsing AI response", e);
+            return Mono.just(profile); // Return unchanged on error
+        }
+    }
+
+    public Mono<ClientProfileDto> getClientProfile(String userId) {
+        return profileRepository.findByUserId(userId)
+                .map(this::entityToDto)
+                .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Profile not found")));
+    }
+
+    // --- Helpers ---
 
     private ClientProfileDto entityToDto(ClientProfile profile) {
         return new ClientProfileDto(
                 profile.getUserId(),
                 profile.getName(),
                 profile.getPhone(),
+                profile.getEmail(),
                 profile.getSkills(),
                 profile.getLatitude(),
                 profile.getLongitude(),
+                // Map the new AI fields here:
+                profile.getAiGeneratedSummary(),
+                profile.getAverageRating(),
+                profile.getTotalReviews(),
+                profile.getJobSuccessRate(),
+                profile.getExperienceLevel(),
+                profile.getRecommendedWagePerHour(),
+                profile.getProfileStrengthScore(),
+                profile.getTopReviewKeywords(),
+                profile.getLastAiUpdate(),
+                // End AI fields
                 profile.getProfileCompletionPercent(),
                 profile.getRecommendationFlag(),
-
-                // --- ADDED NEW FIELDS ---
-                profile.getEmail(),
                 profile.getCreatedAt()
-                // --- END OF NEW FIELDS ---
         );
     }
 
-    // (calculateCompletion method is unchanged)
-    private int calculateCompletion(ClientProfileDto dto) {
+    private int calculateCompletion(ClientProfile p) {
         int complete = 0;
-        int totalFields = 4;
-
-        if (dto.name() != null && !dto.name().isBlank()) complete++;
-        if (dto.phone() != null && !dto.phone().isBlank()) complete++;
-        if (dto.skills() != null && !dto.skills().isEmpty()) complete++;
-        if (dto.latitude() != null && dto.longitude() != null) complete++;
-
-        return (complete * 100) / totalFields;
+        if (p.getName() != null && !p.getName().isBlank()) complete++;
+        if (p.getPhone() != null && !p.getPhone().isBlank()) complete++;
+        if (p.getSkills() != null && !p.getSkills().isEmpty()) complete++;
+        if (p.getLatitude() != null && p.getLongitude() != null) complete++;
+        return (complete * 100) / 4;
     }
 }

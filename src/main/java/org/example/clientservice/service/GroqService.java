@@ -32,14 +32,25 @@ public class GroqService {
     @Value("${groq.api.model}")
     private String model;
 
-    public Mono<String> generateProfileAnalysis(ClientProfile profile, List<ReviewRating> reviews) {
-        // Construct the prompt context
-        String context = buildContext(profile, reviews);
+    /**
+     * Generates a new monthly summary using previous context + new reviews.
+     */
+    public Mono<String> generateMonthlyProfileUpdate(ClientProfile profile, List<ReviewRating> newReviews) {
+
+        String context = buildIncrementalContext(profile, newReviews);
 
         Map<String, Object> requestBody = Map.of(
                 "model", model,
                 "messages", List.of(
-                        Map.of("role", "system", "content", "You are an AI assistant analyzing worker profiles for a gig platform. Generate a JSON response with: summary, experienceLevel, topKeywords (list), and recommendedWage."),
+                        Map.of("role", "system", "content",
+                                "You are an AI managing worker profiles. " +
+                                        "Update the worker's summary and metrics based on their PREVIOUS summary and NEW reviews. " +
+                                        "Generate a JSON response with: " +
+                                        "aiGeneratedSummary (string), " +
+                                        "experienceLevel (Beginner/Intermediate/Expert), " +
+                                        "topReviewKeywords (list of strings, max 5), " +
+                                        "recommendedWagePerHour (number), " +
+                                        "profileStrengthScore (0-100)."),
                         Map.of("role", "user", "content", context)
                 ),
                 "response_format", Map.of("type", "json_object")
@@ -57,15 +68,28 @@ public class GroqService {
                 .doOnError(e -> log.error("Error calling Groq API", e));
     }
 
-    private String buildContext(ClientProfile profile, List<ReviewRating> reviews) {
+    private String buildIncrementalContext(ClientProfile profile, List<ReviewRating> reviews) {
         StringBuilder sb = new StringBuilder();
-        sb.append("Worker Name: ").append(profile.getName()).append("\n");
+
+        sb.append("--- WORKER PROFILE ---\n");
+        sb.append("Name: ").append(profile.getName()).append("\n");
         sb.append("Skills: ").append(profile.getSkills()).append("\n");
-        sb.append("Current Success Rate: ").append(profile.getJobSuccessRate()).append("\n");
-        sb.append("Recent Reviews:\n");
-        for (ReviewRating r : reviews) {
-            sb.append("- Rating: ").append(r.getRating()).append("/5, Text: ").append(r.getReviewText()).append("\n");
+        sb.append("Previous Summary: ").append(profile.getAiGeneratedSummary() != null ? profile.getAiGeneratedSummary() : "No previous summary.").append("\n");
+        sb.append("Current Success Rate: ").append(profile.getJobSuccessRate()).append("\n\n");
+
+        sb.append("--- REVIEWS FROM LAST MONTH ---\n");
+        if (reviews.isEmpty()) {
+            sb.append("No new reviews this month.\n");
+        } else {
+            for (ReviewRating r : reviews) {
+                sb.append(String.format("- [Rating: %d/5] %s\n", r.getRating(), r.getReviewText()));
+            }
         }
+
+        sb.append("\nINSTRUCTIONS: Analyze the new reviews in context of the previous summary. " +
+                "If no new reviews, keep the summary stable but mention consistency. " +
+                "Update the recommended wage based on performance trend.");
+
         return sb.toString();
     }
 
@@ -75,7 +99,7 @@ public class GroqService {
             return root.path("choices").get(0).path("message").path("content").asText();
         } catch (Exception e) {
             log.error("Failed to parse Groq response", e);
-            return "{}";
+            return "{}"; // Return empty JSON on failure
         }
     }
 }

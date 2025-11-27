@@ -17,6 +17,8 @@ public record ClientProfileDto(
         @Size(max = 20)
         String phone,
 
+        String email, // User info
+
         List<String> skills,
 
         @Min(-90) @Max(90)
@@ -25,14 +27,41 @@ public record ClientProfileDto(
         @Min(-180) @Max(180)
         Double longitude,
 
+        // --- AI & METRICS (READ ONLY) ---
+        // These fields are populated by the System/AI, not the user.
+
+        @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+        String aiGeneratedSummary,
+
+        @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+        Double averageRating,
+
+        @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+        Integer totalReviews,
+
+        @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+        Double jobSuccessRate,
+
+        @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+        String experienceLevel,
+
+        @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+        Double recommendedWagePerHour,
+
+        @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+        Integer profileStrengthScore,
+
+        @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+        List<String> topReviewKeywords,
+
+        @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+        Instant lastAiUpdate,
+
+        // --- END AI FIELDS ---
+
         Integer profileCompletionPercent,
         Boolean recommendationFlag,
 
-        // --- ADDED NEW FIELDS ---
-        String email,
-
-        // This makes 'createdAt' read-only in the API response
         @JsonProperty(access = JsonProperty.Access.READ_ONLY)
         Instant createdAt
-        // --- END OF NEW FIELDS ---
 ) {}

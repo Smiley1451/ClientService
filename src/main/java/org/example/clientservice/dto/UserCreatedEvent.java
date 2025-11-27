@@ -16,6 +16,7 @@ public class UserCreatedEvent {
     private String userId;
     private String userName;
     private String email;
+    private String role;
     private Instant createdAt;
     private String source;
 }
