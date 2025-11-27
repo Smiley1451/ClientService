@@ -16,33 +16,33 @@ import org.springframework.stereotype.Component;
 public class UserEventConsumer {
 
     private final ClientProfileService clientProfileService;
-    private final ObjectMapper objectMapper; // INJECT THE OBJECT MAPPER
+    private final ObjectMapper objectMapper;
 
     @KafkaListener(topics = "user-created-topic", groupId = "client-service-group",
-            containerFactory = "kafkaListenerContainerFactory") // Specify the factory from your config
-    public void handleUserCreatedEvent(ConsumerRecord<String, String> record, Acknowledgment ack) { // <-- FULLY MATCHES YOUR CODE
+            containerFactory = "kafkaListenerContainerFactory")
+    public void handleUserCreatedEvent(ConsumerRecord<String, String> record, Acknowledgment ack) {
         try {
             String message = record.value();
             log.info("Raw message received: {}", message);
 
-            // Manually parse the JSON string
+
             UserCreatedEvent event = objectMapper.readValue(message, UserCreatedEvent.class);
 
             clientProfileService.initializeNewClientProfile(event)
                     .subscribe(
                             profile -> {
                                 log.info("Successfully initialized profile for userId: {}", profile.getUserId());
-                                ack.acknowledge(); // Acknowledge the message on success
+                                ack.acknowledge();
                             },
                             error -> {
                                 log.error("Error processing UserCreatedEvent: {}", error.getMessage());
-                                // Do not acknowledge, let error handler send to DLT
+
                             }
                     );
 
         } catch (Exception e) {
             log.error("Failed to process message: {}", e.getMessage());
-            // Do not acknowledge, let error handler send to DLT
+
         }
     }
 }

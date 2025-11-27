@@ -17,12 +17,10 @@ public class AiSchedulerConfig {
     private final ClientProfileService clientProfileService;
     private final ClientProfileRepository clientProfileRepository;
 
-    // Runs at 00:00:00 on the 1st day of every month
     @Scheduled(cron = "0 0 0 1 * ?")
     public void runMonthlyAiUpdates() {
         log.info("Starting monthly AI profile refresh...");
 
-        // Fetch all userIds and trigger update for each
         clientProfileRepository.findAll()
                 .flatMap(profile -> {
                     log.info("Updating profile for: {}", profile.getUserId());

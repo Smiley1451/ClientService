@@ -27,8 +27,7 @@ public record ClientProfileDto(
         @Min(-180) @Max(180)
         Double longitude,
 
-        // --- AI & METRICS (READ ONLY) ---
-        // These fields are populated by the System/AI, not the user.
+
 
         @JsonProperty(access = JsonProperty.Access.READ_ONLY)
         String aiGeneratedSummary,
@@ -57,7 +56,7 @@ public record ClientProfileDto(
         @JsonProperty(access = JsonProperty.Access.READ_ONLY)
         Instant lastAiUpdate,
 
-        // --- END AI FIELDS ---
+
 
         Integer profileCompletionPercent,
         Boolean recommendationFlag,

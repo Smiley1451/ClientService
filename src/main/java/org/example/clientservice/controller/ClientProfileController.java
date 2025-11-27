@@ -16,7 +16,7 @@ public class ClientProfileController {
 
     private final ClientProfileService clientProfileService;
 
-    // --- PUBLIC/USER ENDPOINTS ---
+
 
     @GetMapping("/{userId}")
     public Mono<ResponseEntity<ClientProfileDto>> getClientProfile(@PathVariable String userId) {
@@ -24,10 +24,7 @@ public class ClientProfileController {
                 .map(ResponseEntity::ok);
     }
 
-    /**
-     * Update Profile (User Editable Fields Only)
-     * Name, Phone, Skills, Location
-     */
+
     @PutMapping("/{userId}")
     public Mono<ResponseEntity<ClientProfileDto>> updateClientProfile(
             @PathVariable String userId,
@@ -37,12 +34,7 @@ public class ClientProfileController {
                 .map(ResponseEntity::ok);
     }
 
-    // --- SYSTEM/ADMIN ENDPOINTS ---
 
-    /**
-     * Manually Trigger AI Refresh (For Demo/Testing)
-     * Normally this runs via Scheduler on the 1st of the month.
-     */
     @PostMapping("/{userId}/refresh-ai")
     public Mono<ResponseEntity<ClientProfileDto>> triggerAiRefresh(@PathVariable String userId) {
         return clientProfileService.performMonthlyAiAnalysis(userId)

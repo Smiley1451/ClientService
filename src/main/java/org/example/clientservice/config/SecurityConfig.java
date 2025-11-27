@@ -1,7 +1,5 @@
 package org.example.clientservice.config;
 
-
-
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -20,18 +18,12 @@ public class SecurityConfig {
     public SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity http) {
         http
                 .authorizeExchange(exchange -> exchange
-                        // Allow health checks
 
-
-                        // Secure all other API endpoints
-                        .pathMatchers("/api/clients/**").permitAll()
-
-
+                        .anyExchange().permitAll()
                 )
-                .oauth2ResourceServer(oauth2 -> oauth2
-                               .jwt()
-                )
-                .csrf(ServerHttpSecurity.CsrfSpec::disable); // Disable CSRF for stateless API
+                .csrf(ServerHttpSecurity.CsrfSpec::disable) // Disable CSRF
+                .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable) // Disable Basic Auth
+                .formLogin(ServerHttpSecurity.FormLoginSpec::disable); // Disable Form Login
 
         return http.build();
     }

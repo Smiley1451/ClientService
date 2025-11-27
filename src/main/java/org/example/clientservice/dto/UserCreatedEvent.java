@@ -5,10 +5,6 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import java.time.Instant;
 
-/**
- * Represents the user creation event consumed from Kafka.
- * This class structure matches your new requirement.
- */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

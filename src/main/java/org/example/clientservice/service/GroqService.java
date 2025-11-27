@@ -32,9 +32,7 @@ public class GroqService {
     @Value("${groq.api.model}")
     private String model;
 
-    /**
-     * Generates a new monthly summary using previous context + new reviews.
-     */
+
     public Mono<String> generateMonthlyProfileUpdate(ClientProfile profile, List<ReviewRating> newReviews) {
 
         String context = buildIncrementalContext(profile, newReviews);
@@ -99,7 +97,7 @@ public class GroqService {
             return root.path("choices").get(0).path("message").path("content").asText();
         } catch (Exception e) {
             log.error("Failed to parse Groq response", e);
-            return "{}"; // Return empty JSON on failure
+            return "{}";
         }
     }
 }

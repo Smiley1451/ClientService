@@ -31,9 +31,7 @@ public class ClientProfileService {
     private final GroqService groqService;
     private final ObjectMapper objectMapper;
 
-    /**
-     * 1. Initialize Profile from Kafka Event (Auth Service)
-     */
+
     public Mono<ClientProfile> initializeNewClientProfile(UserCreatedEvent event) {
         log.info("Initializing new profile for userId: {}", event.getUserId());
 
@@ -43,7 +41,6 @@ public class ClientProfileService {
                 .email(event.getEmail())
                 .source(event.getSource())
                 .createdAt(event.getCreatedAt())
-                // Defaults
                 .profileCompletionPercent(0)
                 .recommendationFlag(false)
                 .totalReviews(0)
@@ -56,16 +53,11 @@ public class ClientProfileService {
                 .doOnError(e -> log.error("Failed to initialize profile for userId: {}", event.getUserId(), e));
     }
 
-    /**
-     * 2. User Update Endpoint (Restricted)
-     * User can ONLY update: Name, Phone, Skills, Location.
-     * User CANNOT update: AI Summary, Ratings, Scores, Wage.
-     */
+
     public Mono<ClientProfileDto> updateClientProfile(String userId, Mono<ClientProfileDto> profileDtoMono) {
         return profileRepository.findByUserId(userId)
                 .flatMap(existingProfile -> profileDtoMono.flatMap(dto -> {
 
-                    // Explicitly mapping ONLY user-editable fields
                     if(dto.name() != null) existingProfile.setName(dto.name());
                     if(dto.phone() != null) existingProfile.setPhone(dto.phone());
                     if(dto.skills() != null) existingProfile.setSkills(dto.skills());
@@ -81,14 +73,8 @@ public class ClientProfileService {
                 .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Profile not found")));
     }
 
-    /**
-     * 3. Monthly AI Refresh Logic
-     * - Fetches "Last Month's" reviews.
-     * - Calls Groq with (Profile + Reviews).
-     * - Updates only the AI/Metric fields.
-     */
+
     public Mono<ClientProfileDto> performMonthlyAiAnalysis(String userId) {
-        // Define "Last Month" range
         Instant now = Instant.now();
         Instant startOfLastMonth = now.minus(30, ChronoUnit.DAYS); // Approximate for demo
 
@@ -97,7 +83,6 @@ public class ClientProfileService {
                         reviewRepository.findByWorkerIdAndCreatedAtBetween(userId, startOfLastMonth, now)
                                 .collectList()
                                 .flatMap(reviews -> {
-                                    // Call LLM
                                     return groqService.generateMonthlyProfileUpdate(profile, reviews)
                                             .flatMap(jsonResponse -> updateProfileWithAiData(profile, jsonResponse));
                                 })
@@ -109,7 +94,6 @@ public class ClientProfileService {
         try {
             JsonNode root = objectMapper.readTree(jsonResponse);
 
-            // Map LLM fields
             if (root.has("aiGeneratedSummary"))
                 profile.setAiGeneratedSummary(root.get("aiGeneratedSummary").asText());
             if (root.has("experienceLevel"))
@@ -131,7 +115,7 @@ public class ClientProfileService {
 
         } catch (Exception e) {
             log.error("Error parsing AI response", e);
-            return Mono.just(profile); // Return unchanged on error
+            return Mono.just(profile);
         }
     }
 
@@ -141,7 +125,6 @@ public class ClientProfileService {
                 .switchIfEmpty(Mono.error(new ResponseStatusException(HttpStatus.NOT_FOUND, "Profile not found")));
     }
 
-    // --- Helpers ---
 
     private ClientProfileDto entityToDto(ClientProfile profile) {
         return new ClientProfileDto(
