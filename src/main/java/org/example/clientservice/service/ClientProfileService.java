@@ -90,6 +90,16 @@ public class ClientProfileService {
                 .map(this::entityToDto);
     }
 
+    public Mono<Void> updateLocation(String userId, Double lat, Double lon) {
+        return profileRepository.findByUserId(userId)
+                .flatMap(profile -> {
+                    profile.setLatitude(lat);
+                    profile.setLongitude(lon);
+                    return profileRepository.save(profile);
+                })
+                .then();
+    }
+
     private Mono<ClientProfile> updateProfileWithAiData(ClientProfile profile, String jsonResponse) {
         try {
             JsonNode root = objectMapper.readTree(jsonResponse);
