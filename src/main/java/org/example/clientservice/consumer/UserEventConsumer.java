@@ -18,7 +18,7 @@ public class UserEventConsumer {
     private final ClientProfileService clientProfileService;
     private final ObjectMapper objectMapper;
 
-    @KafkaListener(topics = "user-created-topic", groupId = "client-service-group",
+    @KafkaListener(topics = "user.created", groupId = "client-service-group",
             containerFactory = "kafkaListenerContainerFactory")
     public void handleUserCreatedEvent(ConsumerRecord<String, String> record, Acknowledgment ack) {
         try {

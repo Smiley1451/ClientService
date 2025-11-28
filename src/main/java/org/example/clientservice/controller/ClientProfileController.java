@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 @RestController
@@ -39,5 +40,16 @@ public class ClientProfileController {
     public Mono<ResponseEntity<ClientProfileDto>> triggerAiRefresh(@PathVariable String userId) {
         return clientProfileService.performMonthlyAiAnalysis(userId)
                 .map(ResponseEntity::ok);
+    }
+
+
+    @GetMapping
+    public Mono<ResponseEntity<Flux<ClientProfileDto>>> getAllProfiles(
+            @RequestParam(required = false) String skill,
+            @RequestParam(required = false) Double minRating) {
+
+        return Mono.just(ResponseEntity.ok(
+                clientProfileService.searchProfiles(skill, minRating)
+        ));
     }
 }

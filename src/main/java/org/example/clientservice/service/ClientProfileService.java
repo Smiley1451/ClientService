@@ -14,6 +14,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.time.Instant;
@@ -64,7 +65,6 @@ public class ClientProfileService {
                     if(dto.latitude() != null) existingProfile.setLatitude(dto.latitude());
                     if(dto.longitude() != null) existingProfile.setLongitude(dto.longitude());
 
-                    // Recalculate completion (local logic)
                     existingProfile.setProfileCompletionPercent(calculateCompletion(existingProfile));
 
                     return profileRepository.save(existingProfile);
@@ -126,6 +126,21 @@ public class ClientProfileService {
     }
 
 
+    public Flux<ClientProfileDto> searchProfiles(String skill, Double minRating) {
+        Flux<ClientProfile> profiles;
+
+        if (skill != null && !skill.isBlank()) {
+            profiles = profileRepository.findBySkill(skill);
+        } else if (minRating != null) {
+            profiles = profileRepository.findByAverageRatingGreaterThanEqual(minRating);
+        } else {
+            profiles = profileRepository.findAll();
+        }
+
+        return profiles.map(this::entityToDto);
+    }
+
+
     private ClientProfileDto entityToDto(ClientProfile profile) {
         return new ClientProfileDto(
                 profile.getUserId(),
@@ -135,7 +150,6 @@ public class ClientProfileService {
                 profile.getSkills(),
                 profile.getLatitude(),
                 profile.getLongitude(),
-                // Map the new AI fields here:
                 profile.getAiGeneratedSummary(),
                 profile.getAverageRating(),
                 profile.getTotalReviews(),
@@ -145,7 +159,6 @@ public class ClientProfileService {
                 profile.getProfileStrengthScore(),
                 profile.getTopReviewKeywords(),
                 profile.getLastAiUpdate(),
-                // End AI fields
                 profile.getProfileCompletionPercent(),
                 profile.getRecommendationFlag(),
                 profile.getCreatedAt()
