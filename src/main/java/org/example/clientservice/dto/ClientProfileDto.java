@@ -57,6 +57,7 @@ public record ClientProfileDto(
         Instant lastAiUpdate,
 
 
+        String profilePictureUrl,
 
         Integer profileCompletionPercent,
         Boolean recommendationFlag,

@@ -1,13 +1,13 @@
 package org.example.clientservice.consumer;
 
-import com.fasterxml.jackson.databind.ObjectMapper; // IMPORT THIS
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.example.clientservice.config.UserCreatedEvent;
 import org.example.clientservice.service.ClientProfileService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.kafka.clients.consumer.ConsumerRecord; // IMPORT THIS
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.springframework.kafka.annotation.KafkaListener;
-import org.springframework.kafka.support.Acknowledgment; // IMPORT THIS
+import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.stereotype.Component;
 
 @Component

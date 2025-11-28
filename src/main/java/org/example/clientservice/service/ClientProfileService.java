@@ -151,6 +151,16 @@ public class ClientProfileService {
     }
 
 
+    public Mono<ClientProfileDto> updateProfilePicture(String userId, String imageUrl) {
+        return profileRepository.findByUserId(userId)
+                .flatMap(profile -> {
+                    profile.setProfilePictureUrl(imageUrl);
+                    return profileRepository.save(profile);
+                })
+                .map(this::entityToDto);
+    }
+
+
     private ClientProfileDto entityToDto(ClientProfile profile) {
         return new ClientProfileDto(
                 profile.getUserId(),
@@ -169,6 +179,7 @@ public class ClientProfileService {
                 profile.getProfileStrengthScore(),
                 profile.getTopReviewKeywords(),
                 profile.getLastAiUpdate(),
+                profile.getProfilePictureUrl(),
                 profile.getProfileCompletionPercent(),
                 profile.getRecommendationFlag(),
                 profile.getCreatedAt()

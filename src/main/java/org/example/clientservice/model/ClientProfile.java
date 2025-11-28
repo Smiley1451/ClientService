@@ -63,6 +63,9 @@ public class ClientProfile {
     @Column("last_ai_update")
     private Instant lastAiUpdate;
 
+    @Column("profile_picture_url")
+    private String profilePictureUrl;
+
     @Column("profile_completion_percent")
     private Integer profileCompletionPercent;
 

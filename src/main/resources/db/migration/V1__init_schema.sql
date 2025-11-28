@@ -8,6 +8,7 @@ CREATE TABLE client_profiles (
     name VARCHAR(255),
     email VARCHAR(255),
     phone VARCHAR(50),
+    profile_picture_url TEXT,
 
     -- Demographics / Location
     skills TEXT[],
