@@ -21,6 +21,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -33,12 +34,14 @@ public class ClientProfileService {
     private final ObjectMapper objectMapper;
 
 
+
     public Mono<ClientProfile> initializeNewClientProfile(UserCreatedEvent event) {
         log.info("Initializing new profile for userId: {}", event.getUserId());
 
         ClientProfile newProfile = ClientProfile.builder()
-                .userId(event.getUserId())
-                .name(event.getUserName())
+                .id(UUID.fromString(event.getUserId()))
+                .userId(event.getUserName())
+                .name(null)
                 .email(event.getEmail())
                 .source(event.getSource())
                 .createdAt(event.getCreatedAt())
@@ -50,7 +53,8 @@ public class ClientProfileService {
                 .aiGeneratedSummary("New worker profile initialized.")
                 .build();
 
-        return profileRepository.save(newProfile)
+
+        return profileRepository.createProfile(newProfile)
                 .doOnError(e -> log.error("Failed to initialize profile for userId: {}", event.getUserId(), e));
     }
 

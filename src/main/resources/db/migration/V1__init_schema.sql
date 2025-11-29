@@ -3,7 +3,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- 1. Create Client Profiles Table
 CREATE TABLE client_profiles (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY ,
     user_id VARCHAR(255) NOT NULL UNIQUE,
     name VARCHAR(255),
     email VARCHAR(255),
