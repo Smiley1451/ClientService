@@ -47,24 +47,16 @@ public class ReviewService {
 
 
     private Mono<Void> updateWorkerStats(String workerId) {
-        return reviewRepository.findByWorkerId(workerId)
-                .collectList()
-                .flatMap(reviews -> {
-                    if (reviews.isEmpty()) return Mono.empty();
+        return reviewRepository.getWorkerStats(workerId)
+                .flatMap(stats -> profileRepository.findByUserId(workerId)
+                        .flatMap(profile -> {
+                            double avg = stats.getAvgRating() != null ? stats.getAvgRating() : 0.0;
+                            int count = stats.getTotalReviews() != null ? stats.getTotalReviews() : 0;
 
-                    double avg = reviews.stream()
-                            .mapToInt(ReviewRating::getRating)
-                            .average()
-                            .orElse(0.0);
-                    int count = reviews.size();
-
-                    return profileRepository.findByUserId(workerId)
-                            .flatMap(profile -> {
-                                profile.setAverageRating(avg);
-                                profile.setTotalReviews(count);
-                                return profileRepository.save(profile);
-                            });
-                })
+                            profile.setAverageRating(avg);
+                            profile.setTotalReviews(count);
+                            return profileRepository.save(profile);
+                        }))
                 .then();
     }
 }
