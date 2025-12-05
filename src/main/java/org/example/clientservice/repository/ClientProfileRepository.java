@@ -29,4 +29,9 @@ public interface ClientProfileRepository extends R2dbcRepository<ClientProfile, 
             ":#{#p.averageRating}, :#{#p.jobSuccessRate}, :#{#p.aiGeneratedSummary}) " +
             "RETURNING *")
     Mono<ClientProfile> createProfile(@Param("p") ClientProfile profile);
+
+    @Query("SELECT * FROM client_profile WHERE recommendation_flag = true")
+    Flux<ClientProfile> findAllActiveWorkers();
+
+
 }
